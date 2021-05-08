@@ -6,10 +6,6 @@ step() {
 	printf '\n\033[1;36m%d) %s\033[0m\n' $_step_counter "$@" >&2  # bold cyan
 }
 
-
-step 'Set up timezone'
-setup-timezone -z Europe/Prague
-
 step 'Set up networking'
 cat > /etc/network/interfaces <<-EOF
 	iface lo inet loopback
@@ -23,12 +19,20 @@ sed -Ei \
 	-e 's/^[# ](rc_depend_strict)=.*/\1=NO/' \
 	-e 's/^[# ](rc_logger)=.*/\1=YES/' \
 	-e 's/^[# ](unicode)=.*/\1=YES/' \
+	-e 's/^[# ](rc_cgroup_mode)=.*/\1=unified/' \
 	/etc/rc.conf
 
 step 'Enable services'
 rc-update add acpid default
+rc-update add apparmor default
 rc-update add chronyd default
 rc-update add crond default
+rc-update add docker default
 rc-update add net.eth0 default
 rc-update add net.lo boot
+rc-update add sshd default
 rc-update add termencoding boot
+
+# step 'Install grub'
+# grub-install /dev/sda
+

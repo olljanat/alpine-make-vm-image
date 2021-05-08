@@ -1,6 +1,15 @@
+apparmor@edge
+apparmor-profiles@edge
+apparmor-utils@edge
+ca-certificates
 chrony
-less
+docker
+grub
+grub-efi
+grub-bios
+iptables
 logrotate
+open-iscsi
 openssh
-ssmtp
+net-tools
 sudo

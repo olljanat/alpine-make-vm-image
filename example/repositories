@@ -1,2 +1,3 @@
-https://nl.alpinelinux.org/alpine/v3.11/main
-https://nl.alpinelinux.org/alpine/v3.11/community
+https://dl-cdn.alpinelinux.org/alpine/v3.13/main
+https://dl-cdn.alpinelinux.org/alpine/v3.13/community
+@edge http://dl-cdn.alpinelinux.org/alpine/edge/testing
