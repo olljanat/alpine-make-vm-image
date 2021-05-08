@@ -33,6 +33,6 @@ rc-update add net.lo boot
 rc-update add sshd default
 rc-update add termencoding boot
 
-# step 'Install grub'
-# grub-install /dev/sda
+step 'Install grub'
+grub-install /dev/sda
 

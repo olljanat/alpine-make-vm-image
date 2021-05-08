@@ -5,7 +5,6 @@ ca-certificates
 chrony
 docker
 grub
-grub-efi
 grub-bios
 iptables
 logrotate

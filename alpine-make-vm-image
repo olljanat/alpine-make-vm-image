@@ -418,7 +418,7 @@ nbd_dev=$(attach_image "$IMAGE_FILE" "$IMAGE_FORMAT")
 
 #-----------------------------------------------------------------------
 einfo "Formatting image partition table"
-sudo sfdisk --force "$nbd_dev" < burmilla/partitions
+sudo sfdisk --force "$nbd_dev" < example/partitions
 # nbd_part="${nbd_dev}p1"
 
 #-----------------------------------------------------------------------
@@ -429,12 +429,19 @@ einfo "Formatting image to $ROOTFS"
 # useless for NBD image and prints confusing error).
 [ "$ROOTFS" = ext4 ] && mkfs_args='-O ^64bit -E nodiscard' || mkfs_args='-K'
 
+#partprobe
+#ls -l "${nbd_dev}*"
+
 mkfs.$ROOTFS -L BOOT $mkfs_args "${nbd_dev}p1"
 mkfs.ext4 -L ROOT1 "${nbd_dev}p2"
 mkfs.ext4 -L ROOT2 "${nbd_dev}p3"
+#mkswap "${nbd_dev}p5}"
+#mkfs.ext4 -L VAR "${ndb_dev}p6"
 
 boot_uuid=$(blk_uuid "${nbd_dev}p1")
 root_uuid=$(blk_uuid "${nbd_dev}p2")
+swap_uuid=$(blk_uuid "${nbd_dev}p5")
+var_uuid=$(blk_uuid "${nbd_dev}p6")
 mount_dir=$(mktemp -d /tmp/$PROGNAME.XXXXXX)
 
 #-----------------------------------------------------------------------
@@ -443,6 +450,8 @@ einfo "Mounting image at $mount_dir"
 mount "${nbd_dev}p2" "$mount_dir"
 mkdir -p "$mount_dir/boot"
 mount "${nbd_dev}p1" "$mount_dir/boot"
+mkdir -p "$mount_dir/var"
+#mount "${nbd_dev}p6" "$mount_dir/var"
 
 #-----------------------------------------------------------------------
 einfo 'Installing base system'
@@ -486,7 +495,9 @@ setup_extlinux . "UUID=$root_uuid" "$ROOTFS" "$KERNEL_FLAVOR" "$SERIAL_PORT"
 
 cat > etc/fstab <<-EOF
 	# <fs>		<mountpoint>	<type>	<opts>		<dump/pass>
-	UUID=$root_uuid	/		$ROOTFS	noatime		0 1
+	UUID=$root_uuid	/		$ROOTFS	ro,noatime		0 1
+	UUID=$boot_uuid	/boot		ext4	defaults		0 1
+	UUID=$var_uuid	/var		ext4	rw,noatime		0 1
 EOF
 
 #-----------------------------------------------------------------------
