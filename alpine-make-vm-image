@@ -165,7 +165,7 @@ attach_image() {
 	#fi
 
 	nbd_dev=$(get_available_nbd) || {
-		modprobe nbd max_part=4
+		modprobe nbd
 		sleep 1
 		nbd_dev=$(get_available_nbd)
 	} || die 'No available nbd device found!'
@@ -256,8 +256,10 @@ setup_extlinux() {
 	local modules="$3"  # modules which should be loaded before pivot_root
 	local kernel_flavor="$4"  # name of default kernel to boot
 	local serial_port="$5"  # serial port number for serial console
+	local nbd_dev="$6"
 	local default_kernel="$kernel_flavor"
-	local kernel_opts='apparmor=1 security=apparmor'
+	# local kernel_opts='apparmor=1 security=apparmor'
+	local kernel_opts=''
 
 	[ -z "$serial_port" ] || kernel_opts="console=$serial_port"
 
@@ -276,10 +278,23 @@ setup_extlinux() {
 		"$mnt"/etc/update-extlinux.conf
 
 	block_dev=$(df "$mnt" | tail -n 1 | cut -dp -f1)
-	chroot "$mnt" dd bs=440 count=1 conv=notrunc if=/usr/share/syslinux/mbr.bin of="$block_dev"
-	chroot "$mnt" extlinux --install /boot
-	chroot "$mnt" update-extlinux --warn-only 2>&1 \
-		| grep -Fv 'extlinux: cannot open device /dev' >&2
+	# chroot "$mnt" dd bs=440 count=1 conv=notrunc if=/usr/share/syslinux/mbr.bin of="$block_dev"
+
+	# Tell grub how NBD drives are structured
+	# mkdir -p "$mnt/boot/grub"
+	# echo "(hd0) ${nbd_dev}" > "$mnt/boot/grub/device.map"
+	# echo "(hd0,msdos1) ${nbd_dev}p1" >> "$mnt/boot/grub/device.map"
+	# echo "(hd0,msdos2) ${nbd_dev}p2" >> "$mnt/boot/grub/device.map"
+
+	# chroot "$mnt" grub-install --target i386-pc "$nbd_dev"
+	grub-install --allow-floppy --root-directory="$mnt" --target=i386-pc "$nbd_dev"
+	# chroot "$mnt" /usr/sbin/grub-mkconfig > "$mnt/boot/grub/grub.cfg"
+	# root_uuid=$(lsblk --noheadings --output=uuid "$nbd_dev")
+	# sed -i -e "s/$nbd_dev/$root_uuid/g" "$mnt/boot/grub/grub.cfg"
+	# rm -f "$mnt/boot/grub/device.map"
+	# chroot "$mnt" extlinux --install /boot
+	# chroot "$mnt" update-extlinux --warn-only 2>&1 \
+	# 	| grep -Fv 'extlinux: cannot open device /dev' >&2
 }
 
 # Configures mkinitfs.
@@ -435,8 +450,8 @@ einfo "Formatting image to $ROOTFS"
 mkfs.$ROOTFS -L BOOT $mkfs_args "${nbd_dev}p1"
 mkfs.ext4 -L ROOT1 "${nbd_dev}p2"
 mkfs.ext4 -L ROOT2 "${nbd_dev}p3"
-#mkswap "${nbd_dev}p5}"
-#mkfs.ext4 -L VAR "${ndb_dev}p6"
+mkswap "${nbd_dev}p5"
+mkfs.ext4 -L VAR "${nbd_dev}p6"
 
 boot_uuid=$(blk_uuid "${nbd_dev}p1")
 root_uuid=$(blk_uuid "${nbd_dev}p2")
@@ -451,7 +466,7 @@ mount "${nbd_dev}p2" "$mount_dir"
 mkdir -p "$mount_dir/boot"
 mount "${nbd_dev}p1" "$mount_dir/boot"
 mkdir -p "$mount_dir/var"
-#mount "${nbd_dev}p6" "$mount_dir/var"
+mount "${nbd_dev}p6" "$mount_dir/var"
 
 #-----------------------------------------------------------------------
 einfo 'Installing base system'
@@ -488,19 +503,6 @@ einfo "Installing kernel linux-$KERNEL_FLAVOR"
 _apk add --root . linux-$KERNEL_FLAVOR
 
 #-----------------------------------------------------------------------
-einfo 'Setting up extlinux bootloader'
-
-_apk add --root . --no-scripts syslinux
-setup_extlinux . "UUID=$root_uuid" "$ROOTFS" "$KERNEL_FLAVOR" "$SERIAL_PORT"
-
-cat > etc/fstab <<-EOF
-	# <fs>		<mountpoint>	<type>	<opts>		<dump/pass>
-	UUID=$root_uuid	/		$ROOTFS	ro,noatime		0 1
-	UUID=$boot_uuid	/boot		ext4	defaults		0 1
-	UUID=$var_uuid	/var		ext4	rw,noatime		0 1
-EOF
-
-#-----------------------------------------------------------------------
 if [ "$SERIAL_PORT" ]; then
 	echo "$SERIAL_PORT" >> "$mount_dir"/etc/securetty
 	sed -Ei "s|^[# ]*($SERIAL_PORT:.*)|\1|" "$mount_dir"/etc/inittab
@@ -520,6 +522,20 @@ if [ "$PACKAGES" ]; then
 	einfo 'Installing additional packages'
 	_apk add --root . $PACKAGES
 fi
+
+#-----------------------------------------------------------------------
+einfo 'Setting up extlinux bootloader'
+
+cat > etc/fstab <<-EOF
+	# <fs>		<mountpoint>	<type>	<opts>		<dump/pass>
+	UUID=$root_uuid	/		$ROOTFS	ro,noatime		0 1
+	UUID=$boot_uuid	/boot		ext4	defaults		0 1
+	UUID=$var_uuid	/var		ext4	rw,noatime		0 1
+	tmpfs			/tmp		tmpfs	nosuid,nodev,noatime	0 0
+EOF
+
+_apk add --root . --no-scripts syslinux
+setup_extlinux . "UUID=$root_uuid" "$ROOTFS" "$KERNEL_FLAVOR" "$SERIAL_PORT" "$nbd_dev"
 
 #-----------------------------------------------------------------------
 if [ "$SCRIPT" ]; then

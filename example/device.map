@@ -1,0 +1,5 @@
+# This is a comment line starts with hash '#'
+# General format: BIOS_DRIVE DEVICE_NAME
+(hd0) /dev/nbd15
+(hd0,0) /dev/nbd15p1
+(hd0,1) /dev/nbd15p2

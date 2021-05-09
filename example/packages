@@ -1,14 +1,7 @@
-apparmor@edge
-apparmor-profiles@edge
-apparmor-utils@edge
 ca-certificates
-chrony
-docker
+e2fsprogs
 grub
 grub-bios
 iptables
 logrotate
-open-iscsi
-openssh
 net-tools
-sudo

@@ -22,17 +22,17 @@ sed -Ei \
 	-e 's/^[# ](rc_cgroup_mode)=.*/\1=unified/' \
 	/etc/rc.conf
 
+step 'Remove conflicting tools'
+rm -f /sbin/setup-bootable
+rm -f /sbin/setup-disk
+
 step 'Enable services'
 rc-update add acpid default
-rc-update add apparmor default
-rc-update add chronyd default
-rc-update add crond default
-rc-update add docker default
+# rc-update add apparmor default
+# rc-update add chronyd default
+# rc-update add crond default
+# rc-update add docker default
 rc-update add net.eth0 default
 rc-update add net.lo boot
-rc-update add sshd default
+# rc-update add sshd default
 rc-update add termencoding boot
-
-step 'Install grub'
-grub-install /dev/sda
-
