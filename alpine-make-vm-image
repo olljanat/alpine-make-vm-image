@@ -140,6 +140,8 @@ cleanup() {
 			|| die "Failed to unmount $mount_dir; unmount it and disconnect $nbd_dev manually"
 		rm -Rf "$mount_dir"
 	fi
+	losetup -d "${PART1_DEVICE}" || /bin/true
+	losetup -d "${PART2_DEVICE}" || /bin/true
 	if [ "$nbd_dev" ]; then
 		qemu-nbd --disconnect "$nbd_dev" \
 			|| die "Failed to disconnect $nbd_dev; disconnect it manually"
@@ -147,6 +149,9 @@ cleanup() {
 	if [ "$INSTALL_HOST_PKGS" = yes ]; then
 		_apk del $VIRTUAL_PKG
 	fi
+
+	sleep 5s
+	rmmod nbd || /bin/true
 }
 
 _apk() {
@@ -232,6 +237,7 @@ prepare_chroot() {
 	mount -t proc none "$dest"/proc
 	mount_bind /dev "$dest"/dev
 	mount_bind /sys "$dest"/sys
+	mount_bind /sys/firmware/efi/efivars "$dest"/sys/firmware/efi/efivars
 
 	install -D -m 644 /etc/resolv.conf "$dest"/etc/resolv.conf
 }
@@ -257,6 +263,8 @@ setup_extlinux() {
 	local kernel_flavor="$4"  # name of default kernel to boot
 	local serial_port="$5"  # serial port number for serial console
 	local nbd_dev="$6"
+	local part1_dev="$7"
+	local part2_dev="$8"
 	local default_kernel="$kernel_flavor"
 	# local kernel_opts='apparmor=1 security=apparmor'
 	local kernel_opts=''
@@ -281,14 +289,17 @@ setup_extlinux() {
 	# chroot "$mnt" dd bs=440 count=1 conv=notrunc if=/usr/share/syslinux/mbr.bin of="$block_dev"
 
 	# Tell grub how NBD drives are structured
-	# mkdir -p "$mnt/boot/grub"
-	# echo "(hd0) ${nbd_dev}" > "$mnt/boot/grub/device.map"
-	# echo "(hd0,msdos1) ${nbd_dev}p1" >> "$mnt/boot/grub/device.map"
-	# echo "(hd0,msdos2) ${nbd_dev}p2" >> "$mnt/boot/grub/device.map"
+	# https://itectec.com/superuser/how-to-install-grub-into-an-img-file/
+	mkdir -p "$mnt/boot/grub"
+	echo "(hd0) ${nbd_dev}" > "$mnt/boot/grub/device.map"
+	# echo "(hd0,1) ${part1_dev}" >> "$mnt/boot/grub/device.map"
+	# echo "(hd0,2) ${part2_dev}" >> "$mnt/boot/grub/device.map"
 
-	# chroot "$mnt" grub-install --target i386-pc "$nbd_dev"
-	grub-install --allow-floppy --root-directory="$mnt" --target=i386-pc "$nbd_dev"
-	# chroot "$mnt" /usr/sbin/grub-mkconfig > "$mnt/boot/grub/grub.cfg"
+	# mount --bind /dev "$mnt/dev"
+	chroot "$mnt" /usr/sbin/grub-mkconfig > "$mnt/boot/grub/grub.cfg"
+	chroot "$mnt" grub-install --no-floppy --target=x86_64-efi "$nbd_dev" --recheck --debug
+	# grub-install --no-floppy --grub-mkdevicemap="$mnt/boot/grub/device.map" --root-directory="$mnt" --target=x86_64-efi "$nbd_dev"
+
 	# root_uuid=$(lsblk --noheadings --output=uuid "$nbd_dev")
 	# sed -i -e "s/$nbd_dev/$root_uuid/g" "$mnt/boot/grub/grub.cfg"
 	# rm -f "$mnt/boot/grub/device.map"
@@ -432,41 +443,72 @@ einfo "Attaching image $IMAGE_FILE as a NBD device"
 nbd_dev=$(attach_image "$IMAGE_FILE" "$IMAGE_FORMAT")
 
 #-----------------------------------------------------------------------
+# size of root and boot partion (in MByte)
+IMAGE_TOTAL_SIZE=2048
+BOOT_PARTITION_START=2048
+BOOT_PARTITION_SIZE=50
+#---don't change here---
+BOOT_PARTITION_OFFSET="$((BOOT_PARTITION_START*512))"
+BOOT_PARTITION_BYTES="$((BOOT_PARTITION_SIZE*1024*1024))"
+BOOT_PARTITION_SECTORS="$((BOOT_PARTITION_SIZE*1024*2))"
+ROOT_PARTITION_START="$((BOOT_PARTITION_START+BOOT_PARTITION_SECTORS+1))"
+ROOT_PARTITION_OFFSET="$((ROOT_PARTITION_START*512))"
+#---don't change here---
+
 einfo "Formatting image partition table"
-sudo sfdisk --force "$nbd_dev" < example/partitions
+echo -e "o\ng\nn\np\n1\n${BOOT_PARTITION_START}\n+${BOOT_PARTITION_SECTORS}\nt\n1\nn\np\n2\n${ROOT_PARTITION_START}\n\nw\n" | fdisk "$nbd_dev"
+fdisk -l "$nbd_dev"
+
+# sudo sfdisk --force "$nbd_dev" < example/partitions
 # nbd_part="${nbd_dev}p1"
 
 #-----------------------------------------------------------------------
 einfo "Formatting image to $ROOTFS"
 
-# syslinux 6.0.3 cannot boot from ext4 w/ 64bit feature enabled.
 # -E nodiscard / -K - do not attempt to discard blocks at mkfs time (it's
 # useless for NBD image and prints confusing error).
-[ "$ROOTFS" = ext4 ] && mkfs_args='-O ^64bit -E nodiscard' || mkfs_args='-K'
+[ "$ROOTFS" = ext4 ] && mkfs_args='-E nodiscard' || mkfs_args='-K'
 
 #partprobe
 #ls -l "${nbd_dev}*"
 
-mkfs.$ROOTFS -L BOOT $mkfs_args "${nbd_dev}p1"
-mkfs.ext4 -L ROOT1 "${nbd_dev}p2"
-mkfs.ext4 -L ROOT2 "${nbd_dev}p3"
-mkswap "${nbd_dev}p5"
-mkfs.ext4 -L VAR "${nbd_dev}p6"
+# partition #1 - Type= c W95 FAT32 (LBA)
+#losetup
+PART1_DEVICE=$(losetup -f)
+#losetup -d ${PART1_DEVICE} || /bin/true
+losetup --offset $BOOT_PARTITION_OFFSET --sizelimit $BOOT_PARTITION_BYTES ${PART1_DEVICE} "${nbd_dev}p1"
+mkfs.fat -F32 -n ESP ${PART1_DEVICE}
 
-boot_uuid=$(blk_uuid "${nbd_dev}p1")
-root_uuid=$(blk_uuid "${nbd_dev}p2")
-swap_uuid=$(blk_uuid "${nbd_dev}p5")
-var_uuid=$(blk_uuid "${nbd_dev}p6")
+# partition #2 - Type=83 Linux
+PART2_DEVICE=$(losetup -f)
+#losetup -d ${PART2_DEVICE} || /bin/true
+losetup --offset $ROOT_PARTITION_OFFSET ${PART2_DEVICE} "${nbd_dev}p2"
+mkfs.$ROOTFS $mkfs_args -L ROOTFS ${PART2_DEVICE}
+
+
+# mkfs.$ROOTFS -L BOOT $mkfs_args "${nbd_dev}p1"
+# mkfs.ext4 -L ROOT1 "${nbd_dev}p2"
+# mkfs.ext4 -L ROOT2 "${nbd_dev}p3"
+# mkswap "${nbd_dev}p5"
+# mkfs.ext4 -L VAR "${nbd_dev}p6"
+
+# boot_uuid=$(blk_uuid "${nbd_dev}p1")
+# root_uuid=$(blk_uuid "${nbd_dev}p2")
+# swap_uuid=$(blk_uuid "${nbd_dev}p5")
+# var_uuid=$(blk_uuid "${nbd_dev}p6")
+boot_uuid=$(blk_uuid "${PART1_DEVICE}")
+root_uuid=$(blk_uuid "${PART2_DEVICE}")
 mount_dir=$(mktemp -d /tmp/$PROGNAME.XXXXXX)
 
 #-----------------------------------------------------------------------
 einfo "Mounting image at $mount_dir"
 
-mount "${nbd_dev}p2" "$mount_dir"
-mkdir -p "$mount_dir/boot"
-mount "${nbd_dev}p1" "$mount_dir/boot"
-mkdir -p "$mount_dir/var"
-mount "${nbd_dev}p6" "$mount_dir/var"
+mount "${PART2_DEVICE}" "$mount_dir"
+mkdir -p "$mount_dir/boot/efi"
+mount "${PART1_DEVICE}" "$mount_dir/boot/efi"
+ls -lh "$mount_dir/"
+#mkdir -p "$mount_dir/var"
+#mount "${nbd_dev}p6" "$mount_dir/var"
 
 #-----------------------------------------------------------------------
 einfo 'Installing base system'
@@ -528,14 +570,13 @@ einfo 'Setting up extlinux bootloader'
 
 cat > etc/fstab <<-EOF
 	# <fs>		<mountpoint>	<type>	<opts>		<dump/pass>
-	UUID=$root_uuid	/		$ROOTFS	ro,noatime		0 1
-	UUID=$boot_uuid	/boot		ext4	defaults		0 1
-	UUID=$var_uuid	/var		ext4	rw,noatime		0 1
+	UUID=$root_uuid	/		$ROOTFS	noatime		0 1
+	UUID=$boot_uuid	/boot/efi		vfat	umask=0077		0 1
 	tmpfs			/tmp		tmpfs	nosuid,nodev,noatime	0 0
 EOF
 
 _apk add --root . --no-scripts syslinux
-setup_extlinux . "UUID=$root_uuid" "$ROOTFS" "$KERNEL_FLAVOR" "$SERIAL_PORT" "$nbd_dev"
+setup_extlinux . "UUID=$root_uuid" "$ROOTFS" "$KERNEL_FLAVOR" "$SERIAL_PORT" "$nbd_dev" "${PART1_DEVICE}" "${PART2_DEVICE}"
 
 #-----------------------------------------------------------------------
 if [ "$SCRIPT" ]; then

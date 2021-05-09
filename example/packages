@@ -1,7 +1,8 @@
 ca-certificates
 e2fsprogs
+efibootmgr
 grub
-grub-bios
+grub-efi
 iptables
 logrotate
 net-tools
