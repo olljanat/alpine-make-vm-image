@@ -1,8 +1,6 @@
+bash
+bash-completion
 ca-certificates
-e2fsprogs
-efibootmgr
-grub
-grub-efi
 iptables
 logrotate
 net-tools
