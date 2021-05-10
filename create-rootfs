@@ -22,7 +22,7 @@ alpine-devel@lists.alpinelinux.org-5261cecb.rsa.pub:MIIBIjANBgkqhkiG9w0BAQEFAAOC
 : ${IMAGE_FORMAT:=}
 : ${IMAGE_SIZE:="2G"}
 : ${INITFS_FEATURES:="scsi virtio"}
-: ${KERNEL_FLAVOR:="virt"}
+: ${KERNEL_FLAVOR:="lts"}
 : ${KEYS_DIR:="/etc/apk/keys"}
 : ${PACKAGES:="$(cat example/packages)"}
 : ${REPOS_FILE:="/etc/apk/repositories"}
@@ -36,6 +36,7 @@ SCRIPTPATH=`dirname $SCRIPT`
 trap cleanup HUP INT TERM
 
 mount_dir=$(mktemp -d /tmp/$PROGNAME.XXXXXX)
+mount_dir_var=$(mktemp -d /tmp/$PROGNAME.XXXXXX)
 
 temp_dir=''
 if ! command -v "$APK" >/dev/null; then
@@ -70,16 +71,21 @@ fi
 _apk add --root . --update-cache --initdb alpine-base
 prepare_chroot .
 
+mount_bind "$mount_dir_var" "$mount_dir"
+
 #-----------------------------------------------------------------------
 einfo "Installing and configuring mkinitfs"
 
 _apk add --root . mkinitfs
 setup_mkinitfs . "base $ROOTFS $INITFS_FEATURES"
 
+# Needed by lts kernel
+_apk add --root . "kmod"
+
 #-----------------------------------------------------------------------
 einfo "Installing kernel linux-$KERNEL_FLAVOR"
 
-_apk add --root . linux-$KERNEL_FLAVOR
+_apk add --root . linux-$KERNEL_FLAVOR linux-firmware-none
 
 # -----------------------------------------------
 # einfo 'Enabling base system services'
@@ -98,18 +104,28 @@ fi
 
 #-----------------------------------------------------------------------
 script_name="./example/configure.sh"
-		einfo "Executing script in chroot: $script_name $*"
-		mount_bind "$SCRIPTPATH" mnt/
-		chroot . /bin/sh -c "cd /mnt && ./$script_name \"\$@\"" -- "$@" \
-			|| die 'Script failed'
+einfo "Executing script in chroot: $script_name $*"
+mount_bind "$SCRIPTPATH" mnt/
+chroot . /bin/sh -c "cd /mnt && ./$script_name \"\$@\"" -- "$@" \
+	|| die 'Script failed'
 
-rm -rf "$mount_dir/var/*"
+mkdir -p "$mount_dir/etc"
+cp "$SCRIPTPATH/example/fstab" "$mount_dir/etc/"
 
+einfo "Umount workdirs"
 cd "$SCRIPTPATH"
+umount "$mount_dir"
 umount_recursively "$mount_dir"
 
 einfo "Generating rootfs.tar.xz"
 cd "$mount_dir"
-tar -Jcf "$SCRIPTPATH/rootfs.tar.xz" .
+# tar -Jcf "$SCRIPTPATH/rootfs.tar.xz" .
+tar -cf "$SCRIPTPATH/rootfs.tar" .
+
+einfo "Generating varfs.tar.xz"
+cd "$mount_dir_var"
+# tar -Jcf "$SCRIPTPATH/varfs.tar.xz" .
+tar -cf "$SCRIPTPATH/varfs.tar" .
+
 cd "$SCRIPTPATH"
 rm -rf "$mount_dir"

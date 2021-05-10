@@ -19,12 +19,14 @@ sed -Ei \
 	-e 's/^[# ](rc_depend_strict)=.*/\1=NO/' \
 	-e 's/^[# ](rc_logger)=.*/\1=YES/' \
 	-e 's/^[# ](unicode)=.*/\1=YES/' \
-	-e 's/^[# ](rc_cgroup_mode)=.*/\1=unified/' \
 	/etc/rc.conf
 
-step 'Remove conflicting tools'
-rm -f /sbin/setup-bootable
-rm -f /sbin/setup-disk
+# TODO: investigate what is needed to enable this one without errors?
+# 	-e 's/^[# ](rc_cgroup_mode)=.*/\1=unified/' \
+
+#step 'Remove conflicting tools'
+#rm -f /sbin/setup-bootable
+#rm -f /sbin/setup-disk
 
 step 'Enable services'
 rc-update add acpid default
