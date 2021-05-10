@@ -108,5 +108,8 @@ rm -rf "$mount_dir/var/*"
 cd "$SCRIPTPATH"
 umount_recursively "$mount_dir"
 
-tar -Jcf "$SCRIPTPATH/rootfs.tar.xz" "$mount_dir"
+einfo "Generating rootfs.tar.xz"
+cd "$mount_dir"
+tar -Jcf "$SCRIPTPATH/rootfs.tar.xz" .
+cd "$SCRIPTPATH"
 rm -rf "$mount_dir"
