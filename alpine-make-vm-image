@@ -265,6 +265,7 @@ setup_extlinux() {
 	local nbd_dev="$6"
 	local part1_dev="$7"
 	local part2_dev="$8"
+	local script_path="$9"
 	local default_kernel="$kernel_flavor"
 	# local kernel_opts='apparmor=1 security=apparmor'
 	local kernel_opts=''
@@ -297,9 +298,9 @@ setup_extlinux() {
 
 	# mount --bind /dev "$mnt/dev"
 	chroot "$mnt" /usr/sbin/grub-mkconfig > "$mnt/boot/grub/grub.cfg"
-	chroot "$mnt" grub-install --no-floppy --target=x86_64-efi "$nbd_dev" --recheck
+	chroot "$mnt" grub-install --no-floppy --bootloader-id=boot --target=x86_64-efi "$nbd_dev" --recheck
 	# grub-install --no-floppy --grub-mkdevicemap="$mnt/boot/grub/device.map" --root-directory="$mnt" --target=x86_64-efi "$nbd_dev"
-	cp grub.cfg "$mnt/boot/efi/EFI/alpine/grub.cfg"
+	cp "$script_path/grub.cfg" "$mnt/boot/efi/EFI/boot/grub.cfg"
 
 	# root_uuid=$(lsblk --noheadings --output=uuid "$nbd_dev")
 	# sed -i -e "s/$nbd_dev/$root_uuid/g" "$mnt/boot/grub/grub.cfg"
@@ -387,6 +388,9 @@ done
 : ${ROOTFS:="ext4"}
 : ${SCRIPT_CHROOT:="no"}
 : ${SERIAL_CONSOLE:="no"}
+
+SCRIPT=`realpath -s $0`
+SCRIPTPATH=`dirname $SCRIPT`
 
 case "$ALPINE_BRANCH" in
 	[0-9]*) ALPINE_BRANCH="v$ALPINE_BRANCH";;
@@ -584,7 +588,7 @@ cat > etc/fstab <<-EOF
 EOF
 
 # _apk add --root . --no-scripts syslinux
-setup_extlinux . "UUID=$root_uuid" "$ROOTFS" "$KERNEL_FLAVOR" "$SERIAL_PORT" "$nbd_dev" "${PART1_DEVICE}" "${PART2_DEVICE}"
+setup_extlinux . "UUID=$root_uuid" "$ROOTFS" "$KERNEL_FLAVOR" "$SERIAL_PORT" "$nbd_dev" "${PART1_DEVICE}" "${PART2_DEVICE}" "$SCRIPTPATH"
 
 #-----------------------------------------------------------------------
 if [ "$SCRIPT" ]; then
