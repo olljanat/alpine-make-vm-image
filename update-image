@@ -1,0 +1,55 @@
+#!/bin/bash
+# vim: set ts=4:
+# set -e
+
+. .functions
+. .settings
+
+trap cleanup HUP INT TERM
+
+IMAGE_FILE="/var/lib/libvirt/images/alpine-dual-root.qcow2"
+IMAGE_FORMAT=
+
+einfo 'Mounting image'
+nbd_dev=$(attach_image "$IMAGE_FILE" "$IMAGE_FORMAT")
+sleep 5s
+ls -l "${nbd_dev}*" || /bin/true
+
+mount_dir_root1_root1=$(mktemp -d /tmp/$PROGNAME.XXXXXX)
+mount_dir_root1_root2=$(mktemp -d /tmp/$PROGNAME.XXXXXX)
+# mount_dir_root1_var=$(mktemp -d /tmp/$PROGNAME.XXXXXX)
+# mount_bind "$mount_dir_root1_var" "$mount_dir_root1/var"
+
+einfo 'Updating ROOT1'
+mount "${nbd_dev}p2" "$mount_dir_root1"
+rm -rf "$mount_dir_root1/*"
+prepare_chroot "$mount_dir_root1"
+tar xf rootfs.tar -C "$mount_dir_root1/"
+einfo 'Installing Docker'
+cp "$REPOS_FILE" "$mount_dir_root1/etc/apk"
+_apk add --root "$mount_dir_root1" $(cat example/docker-packages)
+chroot "$mount_dir_root1" rc-update add docker default
+chroot "$mount_dir_root1" ln -s /usr/bin/k3s /usr/bin/kubectl
+rm -rf "$mount_dir_root1/var/*"
+sync
+umount_recursively "$mount_dir_root1"
+
+einfo 'Updating ROOT2'
+mount "${nbd_dev}p3" "$mount_dir_root2"
+rm -rf "$mount_dir_root2/*"
+prepare_chroot "$mount_dir_root2"
+tar xf rootfs.tar -C "$mount_dir_root2/"
+einfo 'Installing K3s'
+cp "$REPOS_FILE" "$mount_dir_root2/etc/apk"
+_apk add --root "$mount_dir_root2" $(cat example/k3s-packages)
+chroot "$mount_dir_root2" rc-update add k3s default
+rm -rf "$mount_dir_root2/var/*"
+sync
+umount_recursively "$mount_dir_root2"
+
+einfo 'Umount image'
+sleep 5
+sync
+qemu-nbd --disconnect "${nbd_dev}"
+sleep 5
+rmmod nbd

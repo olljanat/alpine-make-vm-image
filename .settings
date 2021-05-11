@@ -1,0 +1,44 @@
+
+# Alpine APK keys for verification of packages for x86_64.
+readonly ALPINE_KEYS='
+alpine-devel@lists.alpinelinux.org-4a6a0840.rsa.pub:MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA1yHJxQgsHQREclQu4Ohe\nqxTxd1tHcNnvnQTu/UrTky8wWvgXT+jpveroeWWnzmsYlDI93eLI2ORakxb3gA2O\nQ0Ry4ws8vhaxLQGC74uQR5+/yYrLuTKydFzuPaS1dK19qJPXB8GMdmFOijnXX4SA\njixuHLe1WW7kZVtjL7nufvpXkWBGjsfrvskdNA/5MfxAeBbqPgaq0QMEfxMAn6/R\nL5kNepi/Vr4S39Xvf2DzWkTLEK8pcnjNkt9/aafhWqFVW7m3HCAII6h/qlQNQKSo\nGuH34Q8GsFG30izUENV9avY7hSLq7nggsvknlNBZtFUcmGoQrtx3FmyYsIC8/R+B\nywIDAQAB
+alpine-devel@lists.alpinelinux.org-5261cecb.rsa.pub:MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAwlzMkl7b5PBdfMzGdCT0\ncGloRr5xGgVmsdq5EtJvFkFAiN8Ac9MCFy/vAFmS8/7ZaGOXoCDWbYVLTLOO2qtX\nyHRl+7fJVh2N6qrDDFPmdgCi8NaE+3rITWXGrrQ1spJ0B6HIzTDNEjRKnD4xyg4j\ng01FMcJTU6E+V2JBY45CKN9dWr1JDM/nei/Pf0byBJlMp/mSSfjodykmz4Oe13xB\nCa1WTwgFykKYthoLGYrmo+LKIGpMoeEbY1kuUe04UiDe47l6Oggwnl+8XD1MeRWY\nsWgj8sF4dTcSfCMavK4zHRFFQbGp/YFJ/Ww6U9lA3Vq0wyEI6MCMQnoSMFwrbgZw\nwwIDAQAB
+'
+
+: ${APK_TOOLS_URI:="https://github.com/alpinelinux/apk-tools/releases/download/v2.10.4/apk-tools-2.10.4-x86_64-linux.tar.gz"}
+: ${APK_TOOLS_SHA256:="efe948160317fe78058e207554d0d9195a3dfcc35f77df278d30448d7b3eb892"}
+
+: ${APK:="apk"}
+: ${APK_OPTS:="--no-progress --no-cache"}
+
+
+: ${ALPINE_BRANCH:="latest-stable"}
+: ${ALPINE_MIRROR:="https://nl.alpinelinux.org/alpine"}
+: ${CLEANUP:="yes"}
+: ${IMAGE_FORMAT:=}
+: ${IMAGE_SIZE:="2G"}
+: ${INITFS_FEATURES:="scsi virtio"}
+: ${KERNEL_FLAVOR:="lts"}
+: ${KEYS_DIR:="/etc/apk/keys"}
+: ${PACKAGES:="$(cat example/packages)"}
+: ${REPOS_FILE:=""}
+: ${ROOTFS:="ext4"}
+: ${SCRIPT_CHROOT:="no"}
+: ${SERIAL_CONSOLE:="no"}
+
+SCRIPT=`realpath -s $0`
+SCRIPTPATH=`dirname $SCRIPT`
+
+REPOS_FILE="$SCRIPTPATH/example/repositories"
+
+trap cleanup HUP INT TERM
+
+temp_dir=''
+if ! command -v "$APK" >/dev/null; then
+	einfo "$APK not found, downloading static apk-tools"
+
+	temp_dir="$(mktemp -d /tmp/$PROGNAME.XXXXXX)"
+	wgets "$APK_TOOLS_URI" "$APK_TOOLS_SHA256" "$temp_dir"
+	tar -C "$temp_dir" -xzf "$temp_dir/${APK_TOOLS_URI##*/}"
+	APK="$(ls "$temp_dir"/apk-tools-*/apk)"
+fi
