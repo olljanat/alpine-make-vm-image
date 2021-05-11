@@ -8,8 +8,12 @@ step() {
 
 step 'Set up networking'
 cat > /etc/network/interfaces <<-EOF
+	auto lo
 	iface lo inet loopback
+
+	auto eth0
 	iface eth0 inet dhcp
+		hostname alpine
 EOF
 ln -s networking /etc/init.d/net.lo
 ln -s networking /etc/init.d/net.eth0
@@ -24,17 +28,11 @@ sed -Ei \
 # TODO: investigate what is needed to enable this one without errors?
 # 	-e 's/^[# ](rc_cgroup_mode)=.*/\1=unified/' \
 
-#step 'Remove conflicting tools'
-#rm -f /sbin/setup-bootable
-#rm -f /sbin/setup-disk
-
 step 'Enable services'
 rc-update add acpid default
-# rc-update add apparmor default
-# rc-update add chronyd default
-# rc-update add crond default
-# rc-update add docker default
+rc-update add chronyd default
+rc-update add crond default
 rc-update add net.eth0 default
 rc-update add net.lo boot
-# rc-update add sshd default
+rc-update add sshd default
 rc-update add termencoding boot

@@ -11,14 +11,22 @@ IMAGE_FILE="/var/lib/libvirt/images/alpine-dual-root.qcow2"
 IMAGE_FORMAT=
 
 einfo 'Mounting image'
+modprobe nbd
+sleep 5s
 nbd_dev=$(attach_image "$IMAGE_FILE" "$IMAGE_FORMAT")
 sleep 5s
 ls -l "${nbd_dev}*" || /bin/true
 
-mount_dir_root1_root1=$(mktemp -d /tmp/$PROGNAME.XXXXXX)
-mount_dir_root1_root2=$(mktemp -d /tmp/$PROGNAME.XXXXXX)
-# mount_dir_root1_var=$(mktemp -d /tmp/$PROGNAME.XXXXXX)
-# mount_bind "$mount_dir_root1_var" "$mount_dir_root1/var"
+mount_dir_var=$(mktemp -d /tmp/$PROGNAME.XXXXXX)
+mount_dir_root1=$(mktemp -d /tmp/$PROGNAME.XXXXXX)
+mount_dir_root2=$(mktemp -d /tmp/$PROGNAME.XXXXXX)
+
+einfo 'Updating VARFS'
+mount "${nbd_dev}p4" "$mount_dir_var"
+rm -rf "$mount_dir_var/*"
+tar xf varfs.tar -C "$mount_dir_var/"
+sync
+umount_recursively "$mount_dir_var"
 
 einfo 'Updating ROOT1'
 mount "${nbd_dev}p2" "$mount_dir_root1"

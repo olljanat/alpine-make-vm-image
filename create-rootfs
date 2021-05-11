@@ -127,13 +127,3 @@ tar -cf "$SCRIPTPATH/varfs.tar" .
 
 cd "$SCRIPTPATH"
 rm -rf "$mount_dir"
-
-
-# K3s
-# apk add k3s-openrc --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community/
-# rc-update add k3s default
-# rm -rf /var/*
-
-# Docker
-# apk add docker --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community/
-# rc-update add docker default
