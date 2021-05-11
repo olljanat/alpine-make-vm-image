@@ -31,13 +31,13 @@ alpine-devel@lists.alpinelinux.org-5261cecb.rsa.pub:MIIBIjANBgkqhkiG9w0BAQEFAAOC
 : ${SERIAL_CONSOLE:="no"}
 
 SCRIPT=`realpath -s $0`
-SCRIPTPATH=`dirname $SCRIPT`
+script_path=`dirname $SCRIPT`
 
 trap cleanup HUP INT TERM
 
 mount_dir=$(mktemp -d /tmp/$PROGNAME.XXXXXX)
 mount_dir_var=$(mktemp -d /tmp/$PROGNAME.XXXXXX)
-mount_bind "$mount_dir_var" "$mount_dir/var"
+mount_bind "${$mount_dir}_var" "${$mount_dir}/var"
 
 temp_dir=''
 if ! command -v "$APK" >/dev/null; then
@@ -52,7 +52,7 @@ fi
 #-----------------------------------------------------------------------
 einfo 'Installing base system'
 
-cd "$mount_dir"
+cd "${$mount_dir}"
 
 mkdir -p etc/apk/keys
 if [ -f "$REPOS_FILE" ]; then
@@ -104,32 +104,32 @@ fi
 #-----------------------------------------------------------------------
 script_name="./example/configure.sh"
 einfo "Executing script in chroot: $script_name $*"
-mount_bind "$SCRIPTPATH" mnt/
+mount_bind "${script_path}" mnt/
 chroot . /bin/sh -c "cd /mnt && ./$script_name \"\$@\"" -- "$@" \
 	|| die 'Script failed'
 
-cp "$SCRIPTPATH/example/fstab" "$mount_dir/etc/"
-cp "$SCRIPTPATH/example/issue" "$mount_dir/etc/"
-cp "$SCRIPTPATH/example/sshd_config" "$mount_dir/etc/ssh/"
-cp "$SCRIPTPATH/example/sysctl.conf" "$mount_dir/etc/"
-echo > "$mount_dir/etc/motd"
+cp "${script_path}/example/fstab" "${$mount_dir}/etc/"
+cp "${script_path}/example/issue" "${$mount_dir}/etc/"
+cp "${script_path}/example/sshd_config" "${$mount_dir}/etc/ssh/"
+cp "${script_path}/example/sysctl.conf" "${$mount_dir}/etc/"
+echo > "${$mount_dir}/etc/motd"
 
 einfo "Umount workdirs"
-cd "$SCRIPTPATH"
-umount_recursively "$mount_dir"
+cd "${script_path}"
+umount_recursively "${$mount_dir}"
 
 einfo "Generating rootfs.tar.xz"
-cd "$mount_dir"
-rm -rf "$mount_dir/home"
-rm -rf "$mount_dir/root"
-# tar -Jcf "$SCRIPTPATH/rootfs.tar.xz" .
-tar -cf "$SCRIPTPATH/rootfs.tar" .
+cd "${$mount_dir}"
+rm -rf "${$mount_dir}/home"
+rm -rf "${$mount_dir}/root"
+# tar -Jcf "${script_path}/rootfs.tar.xz" .
+tar -cf "${script_path}/rootfs.tar" .
 
 einfo "Generating varfs.tar.xz"
-cd "$mount_dir_var"
+cd "${$mount_dir}_var"
 rm -rf ./cache/*
-# tar -Jcf "$SCRIPTPATH/varfs.tar.xz" .
-tar -cf "$SCRIPTPATH/varfs.tar" .
+# tar -Jcf "${script_path}/varfs.tar.xz" .
+tar -cf "${script_path}/varfs.tar" .
 
-cd "$SCRIPTPATH"
-rm -rf "$mount_dir"
+cd "${script_path}"
+rm -rf "${$mount_dir}"
