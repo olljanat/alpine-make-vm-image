@@ -1,2 +1,4 @@
 dbus
+runc@edge
+containerd@edge
 k3s@edge

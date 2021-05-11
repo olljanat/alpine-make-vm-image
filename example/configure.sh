@@ -30,24 +30,25 @@ sed -Ei \
 
 step 'Enable services'
 rc-update add acpid default
-rc-update add chronyd default
 rc-update add crond default
 rc-update add net.eth0 default
 rc-update add net.lo boot
 rc-update add sshd default
 rc-update add termencoding boot
 
+# FixMe: Temporary config to avoid errors on boot
+rc-update del chronyd default
+
 step 'Add users and groups'
+sed -i '/^root/s!/bin/sh!/bin/bash!' /etc/passwd
 passwd -l root
 addgroup -g 1100 rancher
 addgroup -g 1101 docker
 adduser -u 1100 -G rancher -D -h /home/rancher -s /bin/bash rancher
 adduser -u 1101 -G docker -D -h /home/docker -s /bin/bash docker
 adduser rancher docker
-echo 'rancher ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
-echo 'docker ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
 
-# preperation for https://docs.docker.com/engine/security/userns-remap/
+# preparation for https://docs.docker.com/engine/security/userns-remap/
 addgroup -g 1200 user-docker
 adduser -u 1200 -G user-docker -S -H user-docker
 echo 'user-docker:100000:65536' > /etc/subuid
@@ -55,3 +56,14 @@ echo 'user-docker:100000:65536' > /etc/subgid
 
  # FixMe: We shouldn't hardcode password here
 echo "rancher:rancher" | chpasswd
+
+step 'Configure sudo'
+echo 'Defaults	env_reset' > /etc/sudoers
+echo 'Defaults	secure_path="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"' >> /etc/sudoers
+echo 'rancher ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+echo 'docker ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+
+mv /root /var/
+ln -s /var/root /root
+mv /home /var/
+ln -s /var/home /home

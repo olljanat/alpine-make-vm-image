@@ -22,38 +22,50 @@ mount_dir_root1=$(mktemp -d /tmp/$PROGNAME.XXXXXX)
 mount_dir_root2=$(mktemp -d /tmp/$PROGNAME.XXXXXX)
 
 einfo 'Updating VARFS'
-mount "${nbd_dev}p4" "$mount_dir_var"
-rm -rf "$mount_dir_var/*"
-tar xf varfs.tar -C "$mount_dir_var/"
+mount "${nbd_dev}p4" "${mount_dir_var}"
+rm -rf "${mount_dir_var}/*"
+tar --same-owner -xf varfs.tar -C "${mount_dir_var}/"
+chmod 755 "${mount_dir_var}/"
+chmod 755 "${mount_dir_var}/home"
 sync
-umount_recursively "$mount_dir_var"
+umount_recursively "${mount_dir_var}"
 
 einfo 'Updating ROOT1'
-mount "${nbd_dev}p2" "$mount_dir_root1"
-rm -rf "$mount_dir_root1/*"
-prepare_chroot "$mount_dir_root1"
-tar xf rootfs.tar -C "$mount_dir_root1/"
+mount "${nbd_dev}p2" "${mount_dir_root1}"
+rm -rf "${mount_dir_root1}/*"
+prepare_chroot "${mount_dir_root1}"
+tar --same-owner -xf rootfs.tar -C "${mount_dir_root1}/"
 einfo 'Installing Docker'
-cp "$REPOS_FILE" "$mount_dir_root1/etc/apk"
-_apk add --root "$mount_dir_root1" $(cat example/docker-packages)
-chroot "$mount_dir_root1" rc-update add docker default
-chroot "$mount_dir_root1" ln -s /usr/bin/k3s /usr/bin/kubectl
-rm -rf "$mount_dir_root1/var/*"
+cp "$REPOS_FILE" "${mount_dir_root1}/etc/apk"
+_apk add --root "${mount_dir_root1}" $(cat example/docker-packages)
+chroot "${mount_dir_root1}" rc-update add docker default
+rm -rf "${mount_dir_root1}/home"
+rm -rf "${mount_dir_root1}/root"
+rm -rf "${mount_dir_root1}/var/*"
+ln -r -s "${mount_dir_root1}/var/home" "${mount_dir_root1}/home"
+ln -r -s "${mount_dir_root1}/var/root" "${mount_dir_root1}/root"
+chmod 755 "${mount_dir_root1}/"
 sync
-umount_recursively "$mount_dir_root1"
+umount_recursively "${mount_dir_root1}"
 
 einfo 'Updating ROOT2'
-mount "${nbd_dev}p3" "$mount_dir_root2"
-rm -rf "$mount_dir_root2/*"
-prepare_chroot "$mount_dir_root2"
-tar xf rootfs.tar -C "$mount_dir_root2/"
+mount "${nbd_dev}p3" "${mount_dir_root2}"
+rm -rf "${mount_dir_root2}/*"
+prepare_chroot "${mount_dir_root2}"
+tar --same-owner -xf rootfs.tar -C "${mount_dir_root2}/"
 einfo 'Installing K3s'
-cp "$REPOS_FILE" "$mount_dir_root2/etc/apk"
-_apk add --root "$mount_dir_root2" $(cat example/k3s-packages)
-chroot "$mount_dir_root2" rc-update add k3s default
-rm -rf "$mount_dir_root2/var/*"
+cp "$REPOS_FILE" "${mount_dir_root2}/etc/apk"
+_apk add --root "${mount_dir_root2}" $(cat example/k3s-packages)
+chroot "${mount_dir_root2}" rc-update add k3s default
+# chroot "${mount_dir_root2}" ln -s /usr/bin/k3s /usr/bin/kubectl
+rm -rf "${mount_dir_root2}/home"
+rm -rf "${mount_dir_root2}/root"
+rm -rf "${mount_dir_root2}/var/*"
+ln -r -s "${mount_dir_root2}/var/home" "${mount_dir_root2}/home"
+ln -r -s "${mount_dir_root2}/var/root" "${mount_dir_root2}/root"
+chmod 755 "${mount_dir_root2}/"
 sync
-umount_recursively "$mount_dir_root2"
+umount_recursively "${mount_dir_root2}"
 
 einfo 'Umount image'
 sleep 5

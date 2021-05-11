@@ -120,6 +120,8 @@ umount_recursively "$mount_dir"
 
 einfo "Generating rootfs.tar.xz"
 cd "$mount_dir"
+rm -rf "$mount_dir/home"
+rm -rf "$mount_dir/root"
 # tar -Jcf "$SCRIPTPATH/rootfs.tar.xz" .
 tar -cf "$SCRIPTPATH/rootfs.tar" .
 

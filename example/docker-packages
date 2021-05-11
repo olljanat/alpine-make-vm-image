@@ -1,1 +1,5 @@
-docker@edge
+runc@edge
+containerd@edge
+docker-engine@edge
+docker-cli@edge
+docker-openrc@edge
