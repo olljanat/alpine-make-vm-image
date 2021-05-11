@@ -25,7 +25,7 @@ alpine-devel@lists.alpinelinux.org-5261cecb.rsa.pub:MIIBIjANBgkqhkiG9w0BAQEFAAOC
 : ${KERNEL_FLAVOR:="lts"}
 : ${KEYS_DIR:="/etc/apk/keys"}
 : ${PACKAGES:="$(cat example/packages)"}
-: ${REPOS_FILE:="/etc/apk/repositories"}
+: ${REPOS_FILE:="example/repositories"}
 : ${ROOTFS:="ext4"}
 : ${SCRIPT_CHROOT:="no"}
 : ${SERIAL_CONSOLE:="no"}
@@ -37,6 +37,7 @@ trap cleanup HUP INT TERM
 
 mount_dir=$(mktemp -d /tmp/$PROGNAME.XXXXXX)
 mount_dir_var=$(mktemp -d /tmp/$PROGNAME.XXXXXX)
+mount_bind "$mount_dir_var" "$mount_dir/var"
 
 temp_dir=''
 if ! command -v "$APK" >/dev/null; then
@@ -70,8 +71,6 @@ fi
 
 _apk add --root . --update-cache --initdb alpine-base
 prepare_chroot .
-
-mount_bind "$mount_dir_var" "$mount_dir"
 
 #-----------------------------------------------------------------------
 einfo "Installing and configuring mkinitfs"
@@ -109,12 +108,10 @@ mount_bind "$SCRIPTPATH" mnt/
 chroot . /bin/sh -c "cd /mnt && ./$script_name \"\$@\"" -- "$@" \
 	|| die 'Script failed'
 
-mkdir -p "$mount_dir/etc"
 cp "$SCRIPTPATH/example/fstab" "$mount_dir/etc/"
 
 einfo "Umount workdirs"
 cd "$SCRIPTPATH"
-umount "$mount_dir"
 umount_recursively "$mount_dir"
 
 einfo "Generating rootfs.tar.xz"
@@ -124,8 +121,19 @@ tar -cf "$SCRIPTPATH/rootfs.tar" .
 
 einfo "Generating varfs.tar.xz"
 cd "$mount_dir_var"
+rm -rf ./cache/*
 # tar -Jcf "$SCRIPTPATH/varfs.tar.xz" .
 tar -cf "$SCRIPTPATH/varfs.tar" .
 
 cd "$SCRIPTPATH"
 rm -rf "$mount_dir"
+
+
+# K3s
+# apk add k3s-openrc --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community/
+# rc-update add k3s default
+# rm -rf /var/*
+
+# Docker
+# apk add docker --no-cache --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community/
+# rc-update add docker default
