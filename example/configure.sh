@@ -36,3 +36,22 @@ rc-update add net.eth0 default
 rc-update add net.lo boot
 rc-update add sshd default
 rc-update add termencoding boot
+
+step 'Add users and groups'
+passwd -l root
+addgroup -g 1100 rancher
+addgroup -g 1101 docker
+adduser -u 1100 -G rancher -D -h /home/rancher -s /bin/bash rancher
+adduser -u 1101 -G docker -D -h /home/docker -s /bin/bash docker
+adduser rancher docker
+echo 'rancher ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+echo 'docker ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+
+# preperation for https://docs.docker.com/engine/security/userns-remap/
+addgroup -g 1200 user-docker
+adduser -u 1200 -G user-docker -S -H user-docker
+echo 'user-docker:100000:65536' > /etc/subuid
+echo 'user-docker:100000:65536' > /etc/subgid
+
+ # FixMe: We shouldn't hardcode password here
+echo "rancher:rancher" | chpasswd

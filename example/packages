@@ -3,3 +3,4 @@ chrony
 iptables
 logrotate
 openssh
+sudo

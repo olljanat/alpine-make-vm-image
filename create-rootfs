@@ -109,6 +109,10 @@ chroot . /bin/sh -c "cd /mnt && ./$script_name \"\$@\"" -- "$@" \
 	|| die 'Script failed'
 
 cp "$SCRIPTPATH/example/fstab" "$mount_dir/etc/"
+cp "$SCRIPTPATH/example/issue" "$mount_dir/etc/"
+cp "$SCRIPTPATH/example/sshd_config" "$mount_dir/etc/ssh/"
+cp "$SCRIPTPATH/example/sysctl.conf" "$mount_dir/etc/"
+echo > "$mount_dir/etc/motd"
 
 einfo "Umount workdirs"
 cd "$SCRIPTPATH"
