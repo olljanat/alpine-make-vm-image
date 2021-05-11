@@ -24,6 +24,9 @@ mount_dir_root2=$(mktemp -d /tmp/$PROGNAME.XXXXXX)
 einfo 'Updating VARFS'
 mount "${nbd_dev}p4" "${mount_dir_var}"
 rm -rf ${mount_dir_var}/*
+# purge old data
+# cat /dev/zero > ${mount_dir_var}/zero
+# rm -rf ${mount_dir_var}/*
 tar --same-owner -xf varfs.tar -C "${mount_dir_var}/"
 chmod 755 "${mount_dir_var}/"
 chmod 755 "${mount_dir_var}/home"
@@ -33,6 +36,9 @@ umount_recursively "${mount_dir_var}"
 einfo 'Updating ROOT1'
 mount "${nbd_dev}p2" "${mount_dir_root1}"
 rm -rf ${mount_dir_root1}/*
+# purge old data
+# cat /dev/zero > ${mount_dir_root1}/zero
+# rm -rf ${mount_dir_root1}/*
 prepare_chroot "${mount_dir_root1}"
 tar --same-owner -xf rootfs.tar -C "${mount_dir_root1}/"
 einfo 'Installing Docker'
@@ -51,6 +57,9 @@ umount_recursively "${mount_dir_root1}"
 einfo 'Updating ROOT2'
 mount "${nbd_dev}p3" "${mount_dir_root2}"
 rm -rf ${mount_dir_root2}/*
+# purge old data
+# cat /dev/zero > ${mount_dir_root2}/zero
+# rm -rf ${mount_dir_root2}/*
 prepare_chroot "${mount_dir_root2}"
 tar --same-owner -xf rootfs.tar -C "${mount_dir_root2}/"
 einfo 'Installing K3s'
