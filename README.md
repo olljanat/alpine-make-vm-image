@@ -6,4 +6,4 @@ Additionally user can choose "read-only" mode which enables [overlayed tmpfs](ht
 
 
 For demostration purposes first root partition contains Docker and second K3s:
-![alt text](https://raw.githubusercontent.com/oolljanat/alpine-make-vm-image/rootfs-only/screenshot.png "Grub")
+![alt text](https://raw.githubusercontent.com/olljanat/alpine-make-vm-image/rootfs-only/screenshot.png "Grub")
